@@ -1,17 +1,18 @@
-import dagster as dg
-
-import matplotlib.pyplot as plt
-import geopandas as gpd
-
-import duckdb
 import os
 
+import dagster as dg
+import duckdb
+import geopandas as gpd
+import matplotlib.pyplot as plt
+from dagster._utils.backoff import backoff
+
 from dagster_essentials.defs.assets import constants
+from dagster_duckdb import DuckDBResource
 
 
 # src/dagster_essentials/defs/assets/metrics.py
 @dg.asset(deps=["taxi_trips", "taxi_zones"])
-def manhattan_stats() -> None:
+def manhattan_stats(database: DuckDBResource) -> None:
     query = """
         select
             zones.zone,
@@ -24,8 +25,8 @@ def manhattan_stats() -> None:
         group by zone, borough, geometry
     """
 
-    conn = duckdb.connect(os.getenv("DUCKDB_DATABASE"))
-    trips_by_zone = conn.execute(query).fetch_df()
+    with database.get_connection() as conn:
+        trips_by_zone = conn.execute(query).fetch_df()
 
     trips_by_zone["geometry"] = gpd.GeoSeries.from_wkt(trips_by_zone["geometry"])
     trips_by_zone = gpd.GeoDataFrame(trips_by_zone)
@@ -56,7 +57,7 @@ def manhattan_map() -> None:
 
 
 @dg.asset(deps=["taxi_trips"])
-def trips_by_week() -> None:
+def trips_by_week(database: DuckDBResource) -> None:
     query = """
         select
             date_trunc('week', pickup_datetime) as period,
@@ -68,8 +69,8 @@ def trips_by_week() -> None:
         group by period
     """
 
-    conn = duckdb.connect(os.getenv("DUCKDB_DATABASE"))
-    trips_by_vendor = conn.execute(query).fetch_df()
+    with database.get_connection() as conn:
+        trips_by_vendor = conn.execute(query).fetch_df()
 
     with open(constants.TRIPS_BY_WEEK_FILE_PATH, "w") as output_file:
         output_file.write(trips_by_vendor.to_csv(index=False))
