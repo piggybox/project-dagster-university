@@ -39,6 +39,7 @@ def manhattan_stats(database: DuckDBResource) -> None:
 # src/dagster_essentials/defs/assets/metrics.py
 @dg.asset(
     deps=["manhattan_stats"],
+    group_name="metrics",
 )
 def manhattan_map() -> None:
     trips_by_zone = gpd.read_file(constants.MANHATTAN_STATS_FILE_PATH)
@@ -57,7 +58,7 @@ def manhattan_map() -> None:
     plt.close(fig)
 
 
-@dg.asset(deps=["taxi_trips"], partitions_def=weekly_partition)
+@dg.asset(deps=["taxi_trips"], partitions_def=weekly_partition, group_name="metrics")
 def trips_by_week(context: dg.AssetExecutionContext, database: DuckDBResource) -> None:
     period_to_fetch = context.partition_key
 
