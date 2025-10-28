@@ -8,6 +8,7 @@ from dagster._utils.backoff import backoff
 
 from dagster_essentials.defs.assets import constants
 from dagster_duckdb import DuckDBResource
+from dagster_essentials.defs.partitions import weekly_partition
 
 
 # src/dagster_essentials/defs/assets/metrics.py
@@ -56,9 +57,11 @@ def manhattan_map() -> None:
     plt.close(fig)
 
 
-@dg.asset(deps=["taxi_trips"])
-def trips_by_week(database: DuckDBResource) -> None:
-    query = """
+@dg.asset(deps=["taxi_trips"], partitions_def=weekly_partition)
+def trips_by_week(context: dg.AssetExecutionContext, database: DuckDBResource) -> None:
+    period_to_fetch = context.partition_key
+
+    query = f"""
         select
             date_trunc('week', pickup_datetime) as period,
             count(1) as num_trips,
@@ -66,6 +69,8 @@ def trips_by_week(database: DuckDBResource) -> None:
             sum(total_amount) as total_amount,
             sum(trip_distance) as trip_distance
         from trips
+        where pickup_datetime >= '{period_to_fetch}'
+            and pickup_datetime < '{period_to_fetch}'::date + interval '1 week'
         group by period
     """
 
