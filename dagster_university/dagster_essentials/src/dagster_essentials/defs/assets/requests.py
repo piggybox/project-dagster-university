@@ -2,6 +2,7 @@
 import dagster as dg
 import matplotlib.pyplot as plt
 from dagster_duckdb import DuckDBResource
+import base64
 
 from dagster_essentials.defs.assets import constants
 
@@ -14,7 +15,9 @@ class AdhocRequestConfig(dg.Config):
 
 
 @dg.asset(deps=["taxi_zones", "taxi_trips"])
-def adhoc_request(config: AdhocRequestConfig, database: DuckDBResource) -> None:
+def adhoc_request(
+    config: AdhocRequestConfig, database: DuckDBResource
+) -> dg.MaterializeResult:
     file_path = constants.REQUEST_DESTINATION_TEMPLATE_FILE_PATH.format(
         config.filename.split(".")[0]
     )
@@ -69,3 +72,10 @@ def adhoc_request(config: AdhocRequestConfig, database: DuckDBResource) -> None:
 
     plt.savefig(file_path)
     plt.close(fig)
+
+    with open(file_path, "rb") as file:
+        image_data = file.read()
+        base64_data = base64.b64encode(image_data).decode("utf-8")
+        md_content = f"![Image](data:image/jpeg;base64,{base64_data})"
+
+    return dg.MaterializeResult(metadata={"preview": dg.MetadataValue.md(md_content)})
